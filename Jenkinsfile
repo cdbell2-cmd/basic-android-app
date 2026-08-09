@@ -35,6 +35,7 @@ pipeline {
         GRADLE_PROJECT   = 'app/BasicApp'
         APP_MODULE       = 'app'
         OUTPUT_DIR       = "${WORKSPACE}/build/output"
+        ANDROID_HOME     = "${HOME}/Library/Android/sdk"
         ANDROID_SDK_ROOT = "${HOME}/Library/Android/sdk"
     }
 
