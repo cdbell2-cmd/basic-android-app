@@ -103,7 +103,7 @@ pipeline {
             }
             post {
                 always {
-                    androidLint pattern: '**/lint-results-*.xml', allowEmpty: true
+                    archiveArtifacts artifacts: '**/lint-results-*.xml', allowEmptyArchive: true
                 }
             }
         }
