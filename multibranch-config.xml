@@ -1,0 +1,156 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<!--
+  CloudBees CI Multibranch Pipeline Configuration
+  Source: VirgoAndroidMultiBranch_ARM64 config.xml — dcmvenus controller
+  Bundle: 003_2026-07-24_17-53-14_cloudbees-support_item_cloudbees-ci-client-controller-dcmvenus_virgo_android
+
+  Adapted for BasicApp — a minimal Android app used as a pipeline training target.
+  Swap <repoOwner>, <repository>, <repositoryUrl>, and <credentialsId> for your actual repo.
+-->
+<org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject plugin="workflow-multibranch@803.v08103b_87c280">
+
+  <actions/>
+
+  <description>Multi Branch Pipeline to build BasicApp — a minimal Android training app.
+
+2026-07-24 - Modeled from VirgoAndroidMultiBranch_ARM64 pipeline (dcmvenus controller)
+2026-08-09 - Switched to BasicApp training target
+
+Branch strategy:
+  - Builds all branches (*) except: backup* archive*
+  - Scans every 30 minutes; folder interval 4 hours
+  - Builds triggered on scan/indexing only (NoTriggerBranchProperty)
+  - Orphaned branch jobs pruned after 1 day</description>
+
+  <!-- ── FOLDER PROPERTIES ─────────────────────────────────────────────────── -->
+  <properties>
+
+    <org.jenkinsci.plugins.configfiles.folder.FolderConfigFileProperty plugin="config-file-provider@982.vb_a_e458a_37021">
+      <configs class="sorted-set">
+        <comparator class="org.jenkinsci.plugins.configfiles.folder.FolderConfigFileProperty$1"/>
+      </configs>
+    </org.jenkinsci.plugins.configfiles.folder.FolderConfigFileProperty>
+
+    <org.jenkinsci.plugins.docker.workflow.declarative.FolderConfig plugin="docker-workflow@611.v16e84da_6d3ff">
+      <dockerLabel></dockerLabel>
+      <registry plugin="docker-commons@451.vd12c371eeeb_3"/>
+    </org.jenkinsci.plugins.docker.workflow.declarative.FolderConfig>
+
+    <!-- Folder-level environment variables — injected into every branch build.
+         Replace placeholder values with your actual tokens before importing. -->
+    <com.cloudbees.hudson.plugins.folder.properties.EnvVarsFolderProperty plugin="cloudbees-folders-plus@3.469">
+      <properties>HockeyAppToken=REPLACE_WITH_HOCKEYAPP_TOKEN
+dcmbuildAPIToken=REPLACE_WITH_BUILD_API_TOKEN
+androidKeyAlias=REPLACE_WITH_KEY_ALIAS
+androidKeyStorePwd=REPLACE_WITH_KEYSTORE_PASSWORD
+androidKeyStoreAscii=REPLACE_WITH_KEYSTORE_ASCII_ARMORED</properties>
+    </com.cloudbees.hudson.plugins.folder.properties.EnvVarsFolderProperty>
+
+    <org.conjur.jenkins.configuration.FolderConjurConfiguration plugin="Conjur@0.5">
+      <inheritFromParent>true</inheritFromParent>
+      <conjurConfiguration>
+        <applianceURL></applianceURL>
+        <account></account>
+        <credentialID></credentialID>
+        <certificateCredentialID></certificateCredentialID>
+      </conjurConfiguration>
+    </org.conjur.jenkins.configuration.FolderConjurConfiguration>
+
+  </properties>
+
+  <!-- ── FOLDER VIEWS ──────────────────────────────────────────────────────── -->
+  <folderViews class="jenkins.branch.MultiBranchProjectViewHolder" plugin="branch-api@2.1214.v3f652804588d">
+    <owner class="org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject" reference="../.."/>
+  </folderViews>
+
+  <!-- ── HEALTH METRICS ────────────────────────────────────────────────────── -->
+  <healthMetrics>
+    <com.cloudbees.hudson.plugins.folder.health.WorstChildHealthMetric plugin="cloudbees-folder@6.985.va_f1635030cc5">
+      <nonRecursive>false</nonRecursive>
+    </com.cloudbees.hudson.plugins.folder.health.WorstChildHealthMetric>
+    <com.cloudbees.hudson.plugins.folder.health.AverageChildHealthMetric plugin="cloudbees-folders-plus@3.469"/>
+    <com.cloudbees.hudson.plugins.folder.health.JobStatusHealthMetric plugin="cloudbees-folders-plus@3.469">
+      <success>true</success>
+      <failure>true</failure>
+      <unstable>true</unstable>
+      <unbuilt>true</unbuilt>
+      <countVirginJobs>false</countVirginJobs>
+    </com.cloudbees.hudson.plugins.folder.health.JobStatusHealthMetric>
+    <com.cloudbees.hudson.plugins.folder.health.ProjectEnabledHealthMetric plugin="cloudbees-folders-plus@3.469"/>
+  </healthMetrics>
+
+  <icon class="jenkins.branch.MetadataActionFolderIcon" plugin="branch-api@2.1214.v3f652804588d">
+    <owner class="org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject" reference="../.."/>
+  </icon>
+
+  <!-- ── ORPHAN PRUNING ────────────────────────────────────────────────────── -->
+  <!-- Prune dead branches after 1 day, no hard count limit — exact VirgoAndroid setting -->
+  <orphanedItemStrategy class="com.cloudbees.hudson.plugins.folder.computed.DefaultOrphanedItemStrategy" plugin="cloudbees-folder@6.985.va_f1635030cc5">
+    <pruneDeadBranches>true</pruneDeadBranches>
+    <daysToKeep>1</daysToKeep>
+    <numToKeep>-1</numToKeep>
+    <abortBuilds>false</abortBuilds>
+  </orphanedItemStrategy>
+
+  <!-- ── SCAN TRIGGERS ─────────────────────────────────────────────────────── -->
+  <!-- Scan every 30 min; folder reschedule interval 4 hours (14400000 ms)    -->
+  <triggers>
+    <com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger plugin="cloudbees-folder@6.985.va_f1635030cc5">
+      <spec>H/30 * * * *</spec>
+      <interval>14400000</interval>
+    </com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger>
+  </triggers>
+
+  <disabled>false</disabled>
+
+  <!-- ── BRANCH SOURCES ────────────────────────────────────────────────────── -->
+  <sources class="jenkins.branch.MultiBranchProject$BranchSourceList" plugin="branch-api@2.1214.v3f652804588d">
+    <data>
+      <jenkins.branch.BranchSource>
+
+        <source class="org.jenkinsci.plugins.github_branch_source.GitHubSCMSource" plugin="github-branch-source@1810.v913311241fa_9">
+          <id>b2c394d5-ff8b-57e7-c554-b6c749fb4f7e</id>
+          <apiUri>https://api.github.com</apiUri>
+          <!-- Credential must be a GitHub token stored in Jenkins credentials store -->
+          <credentialsId>DCMBUILD_GHEC_API_TOKEN</credentialsId>
+          <repoOwner>cdbell2-cmd</repoOwner>
+          <repository>basic-android-app</repository>
+          <repositoryUrl>https://github.com/cdbell2-cmd/basic-android-app.git</repositoryUrl>
+          <traits>
+            <!-- Discover all branches (strategyId=3); same as VirgoAndroid -->
+            <org.jenkinsci.plugins.github__branch__source.BranchDiscoveryTrait>
+              <strategyId>3</strategyId>
+            </org.jenkinsci.plugins.github__branch__source.BranchDiscoveryTrait>
+            <!-- Branch filter — mirrors VirgoAndroid; no Xcode-specific exclusions -->
+            <jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait plugin="scm-api@704.v3ce5c542825a_">
+              <includes>*</includes>
+              <excludes>backup* archive*</excludes>
+            </jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait>
+          </traits>
+        </source>
+
+        <!-- Build triggered on scan/indexing only — no automatic SCM push trigger -->
+        <strategy class="jenkins.branch.DefaultBranchPropertyStrategy">
+          <properties class="java.util.Arrays$ArrayList">
+            <a class="jenkins.branch.BranchProperty-array">
+              <jenkins.branch.NoTriggerBranchProperty>
+                <triggeredBranchesRegex>.*</triggeredBranchesRegex>
+                <strategy>INDEXING</strategy>
+              </jenkins.branch.NoTriggerBranchProperty>
+            </a>
+          </properties>
+        </strategy>
+
+      </jenkins.branch.BranchSource>
+    </data>
+    <owner class="org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject" reference="../.."/>
+  </sources>
+
+  <!-- ── JENKINSFILE LOCATION ──────────────────────────────────────────────── -->
+  <!-- Jenkinsfile lives at the repository root — exact VirgoAndroid setting   -->
+  <factory class="org.jenkinsci.plugins.workflow.multibranch.WorkflowBranchProjectFactory">
+    <owner class="org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject" reference="../.."/>
+    <scriptPath>Jenkinsfile</scriptPath>
+  </factory>
+
+</org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject>
