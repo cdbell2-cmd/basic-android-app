@@ -59,12 +59,21 @@ pipeline {
         }
 
         // ── 2. CHECKOUT_SOURCES ───────────────────────────────────────────────
-        // rm -rf lines removed: deleting the Gradle caches on every build was
-        // the sole cause of cold builds (5–15 min dependency re-download overhead).
+        // rm -rf ~/.gradle/caches removed: that was the sole cause of cold builds.
+        // Only the file-system journal is cleared here. The journal records absolute
+        // paths to workspace files from the previous build; deleteDir() removes those
+        // files at the end of each build, making the journal stale. A stale journal
+        // causes mergeDebugResources (and similar tasks) to fail with
+        // FileNotFoundException when Gradle tries to hash an output it believes exists.
+        // modules-2/ (Maven artifacts) and build-cache-1/ (task output cache) do not
+        // contain workspace paths and are left intact for the warm build.
         stage('Checkout_Sources') {
             steps {
                 checkout scm
-                sh 'mkdir -p "${OUTPUT_DIR}"'
+                sh '''
+                    rm -rf ~/.gradle/caches/journal-1
+                    mkdir -p "${OUTPUT_DIR}"
+                '''
             }
         }
 
