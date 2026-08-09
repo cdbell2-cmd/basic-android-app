@@ -1,6 +1,7 @@
 #!/usr/bin/env groovy
-// Android MultiBranch Pipeline — BasicApp
+// Android MultiBranch Pipeline — BasicApp (with CloudBees Workspace Caching)
 // Stage structure mirrors VirgoAndroidMultiBranch_ARM64 (Adobe DCM) on CloudBees CI — dcmvenus controller
+// Caching added per: android-workspace-caching-readme.md
 
 def isReleaseBranch      = env.BRANCH_NAME ==~ /release\/.*/
 def isDevelopBranch      = env.BRANCH_NAME == 'develop'
@@ -41,20 +42,33 @@ pipeline {
 
     stages {
 
-        // ── 1. CHECKOUT_SOURCES ───────────────────────────────────────────────
-        // Mirrors VirgoAndroid: checkout + clean Gradle dependency and build caches
-        stage('Checkout_Sources') {
+        // ── 1. RESTORE_CACHE ──────────────────────────────────────────────────
+        // Restore Gradle dependency and build caches before checkout so they are
+        // in place before any work begins.  On first run these are no-ops.
+        // Both paths are outside the workspace, so dir() is required —
+        // readCache/writeCache do not support absolute paths.
+        stage('Restore_Cache') {
             steps {
-                checkout scm
-                sh '''
-                    rm -rf ~/.gradle/caches
-                    rm -rf ~/.gradle/build-cache-1
-                    mkdir -p "${OUTPUT_DIR}"
-                '''
+                dir("${HOME}/.gradle/caches/modules-2") {
+                    readCache name: 'gradle-dependencies'
+                }
+                dir("${HOME}/.gradle/caches/build-cache-1") {
+                    readCache name: 'gradle-build-cache'
+                }
             }
         }
 
-        // ── 2. BUILD_TEST (parallel) ──────────────────────────────────────────
+        // ── 2. CHECKOUT_SOURCES ───────────────────────────────────────────────
+        // rm -rf lines removed: deleting the Gradle caches on every build was
+        // the sole cause of cold builds (5–15 min dependency re-download overhead).
+        stage('Checkout_Sources') {
+            steps {
+                checkout scm
+                sh 'mkdir -p "${OUTPUT_DIR}"'
+            }
+        }
+
+        // ── 3. BUILD_TEST (parallel) ──────────────────────────────────────────
         // Mirrors VirgoAndroid: virgoAndroidBuildStage + androidExecTestStage run in parallel
         stage('Build_Test') {
             parallel {
@@ -90,7 +104,7 @@ pipeline {
             }
         }
 
-        // ── 3. LINT_AND_SONAR ─────────────────────────────────────────────────
+        // ── 4. LINT_AND_SONAR ─────────────────────────────────────────────────
         // Mirrors VirgoAndroid: Virgo_Test_Lint_Sonar_Validation stage
         stage('Lint_And_Sonar') {
             steps {
@@ -108,7 +122,7 @@ pipeline {
             }
         }
 
-        // ── 4. POST_TO_ARTIFACTORY ────────────────────────────────────────────
+        // ── 5. POST_TO_ARTIFACTORY ────────────────────────────────────────────
         // Mirrors VirgoAndroid: archive APK to Artifactory after successful build+test
         stage('Post_To_Artifactory') {
             when { expression { isDistributionBranch } }
@@ -122,7 +136,7 @@ pipeline {
             }
         }
 
-        // ── 5. POST_TO_FIREBASE ───────────────────────────────────────────────
+        // ── 6. POST_TO_FIREBASE ───────────────────────────────────────────────
         // Mirrors VirgoAndroid: Firebase App Distribution via HockeyApp
         stage('Post_To_Firebase') {
             when { expression { isDistributionBranch } }
@@ -142,7 +156,7 @@ pipeline {
             }
         }
 
-        // ── 6. RELEASE_SIGN ───────────────────────────────────────────────────
+        // ── 7. RELEASE_SIGN ───────────────────────────────────────────────────
         // Mirrors VirgoAndroid: APK signing with release keystore credentials
         // Analogous to iOS AppStore_Resign
         stage('Release_Sign') {
@@ -161,7 +175,7 @@ pipeline {
             }
         }
 
-        // ── 7. UPLOAD_TO_PLAYSTORE ────────────────────────────────────────────
+        // ── 8. UPLOAD_TO_PLAYSTORE ────────────────────────────────────────────
         // Mirrors VirgoAndroid: publish release APK; analogous to iOS Upload_To_TestFlight
         stage('Upload_To_PlayStore') {
             when { expression { isPlayStoreBranch } }
@@ -174,7 +188,7 @@ pipeline {
             }
         }
 
-        // ── 8. GENERATEANDPOST_CSDASHBOARDCSV ─────────────────────────────────
+        // ── 9. GENERATEANDPOST_CSDASHBOARDCSV ─────────────────────────────────
         // Mirrors VirgoAndroid: publish build metrics CSV on develop and release branches
         stage('GenerateAndPost_CSDashboardCSV') {
             when {
@@ -195,6 +209,26 @@ pipeline {
     } // end stages
 
     post {
+        // ── WRITE CACHES ──────────────────────────────────────────────────────
+        // Only on successful, non-PR builds:
+        //   - post { success } ensures a failing build never poisons the cache
+        //   - !env.CHANGE_ID skips PR builds; they read the target branch cache
+        //     via automatic multibranch fallback but must not overwrite it
+        success {
+            script {
+                if (!env.CHANGE_ID) {
+                    dir("${HOME}/.gradle/caches/modules-2") {
+                        writeCache name: 'gradle-dependencies',
+                            includes: '**',
+                            excludes: '**/*.lock'
+                    }
+                    dir("${HOME}/.gradle/caches/build-cache-1") {
+                        writeCache name: 'gradle-build-cache', includes: '**'
+                    }
+                }
+            }
+        }
+
         always {
             // Send_Email — mirrors VirgoAndroid post-build notification
             script {
